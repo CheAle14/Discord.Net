@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -299,6 +300,13 @@ namespace Discord.Rest
             var model = await ThreadHelper.CreateThreadAsync(Discord, this, name, type, autoArchiveDuration, message, invitable, slowmode, options);
             return RestThreadChannel.Create(Discord, Guild, model);
         }
+        public async Task<IReadOnlyCollection<RestThreadChannel>> GetPublicArchivedThreadsAsync(DateTimeOffset? before = null, int? limit = null, RequestOptions options = null)
+        {
+            var threads = await ThreadHelper.GetPublicArchivedThreadsAsync(this, Discord, before, limit, options);
+            return threads.Select(x => RestGuildChannel.Create(Discord, Guild, x))
+                .Cast<RestThreadChannel>()
+                .ToImmutableArray();
+        }
         #endregion
 
         #region ITextChannel
@@ -314,6 +322,10 @@ namespace Discord.Rest
 
         async Task<IThreadChannel> ITextChannel.CreateThreadAsync(string name, ThreadType type, ThreadArchiveDuration autoArchiveDuration, IMessage message, bool? invitable, int? slowmode, RequestOptions options)
             => await CreateThreadAsync(name, type, autoArchiveDuration, message, invitable, slowmode, options);
+        async Task<IReadOnlyCollection<IThreadChannel>> ITextChannel.GetPublicArchivedThreadsAsync(DateTimeOffset? before = null, int? limit = null, RequestOptions options = null)
+            => await GetPublicArchivedThreadsAsync(before, limit, options);
+
+
         #endregion
 
         #region IMessageChannel

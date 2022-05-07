@@ -124,7 +124,23 @@ namespace Discord.WebSocket
 
             return thread;
         }
-#endregion
+        public async Task<IReadOnlyCollection<SocketThreadChannel>> GetPublicArchivedThreadsAsync(DateTimeOffset? before = null, int? limit = null, RequestOptions options = null)
+        {
+            var threadModels = await ThreadHelper.GetPublicArchivedThreadsAsync(this, Discord, before, limit, options);
+
+            var threads = new List<SocketThreadChannel>();
+            foreach (var model in threadModels)
+            {
+                var thread = (SocketThreadChannel)Guild.AddOrUpdateChannel(Discord.State, model);
+
+                if (Discord.AlwaysDownloadUsers && Discord.HasGatewayIntent(GatewayIntents.GuildMembers))
+                    await thread.DownloadUsersAsync();
+
+                threads.Add(thread);
+            }
+            return threads.ToImmutableArray();
+        }
+        #endregion
 
         #region Messages
         /// <inheritdoc />
@@ -372,6 +388,10 @@ namespace Discord.WebSocket
         /// <inheritdoc />
         async Task<IThreadChannel> ITextChannel.CreateThreadAsync(string name, ThreadType type, ThreadArchiveDuration autoArchiveDuration, IMessage message, bool? invitable, int? slowmode, RequestOptions options)
             => await CreateThreadAsync(name, type, autoArchiveDuration, message, invitable, slowmode, options);
+
+        async Task<IReadOnlyCollection<IThreadChannel>> ITextChannel.GetPublicArchivedThreadsAsync(DateTimeOffset? before = null, int? limit = null, RequestOptions options = null)
+            => await GetPublicArchivedThreadsAsync(before, limit, options);
+
         #endregion
 
         #region IGuildChannel

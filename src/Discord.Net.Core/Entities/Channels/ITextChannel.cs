@@ -149,5 +149,7 @@ namespace Discord
         /// </returns>
         Task<IThreadChannel> CreateThreadAsync(string name, ThreadType type = ThreadType.PublicThread, ThreadArchiveDuration autoArchiveDuration = ThreadArchiveDuration.OneDay,
             IMessage message = null, bool? invitable = null, int? slowmode = null, RequestOptions options = null);
+
+        Task<IReadOnlyCollection<IThreadChannel>> GetPublicArchivedThreadsAsync(DateTimeOffset? before = null, int? limit = null, RequestOptions options = null);
     }
 }
