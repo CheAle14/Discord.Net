@@ -243,6 +243,27 @@ namespace Discord.Rest
 
             return RestGlobalCommand.Create(client, model);
         }
+
+        public static async Task<RestGlobalCommand> ModifyGlobalApplicationCommandAsync(BaseDiscordClient client, IApplicationCommand command, ApplicationCommandProperties args, RequestOptions options = null)
+        {
+            var model = await InteractionHelper.ModifyGlobalCommandAsync(client, command, args, options);
+
+            return RestGlobalCommand.Create(client, model);
+        }
+        public static Task DeleteGlobalCommandAsync(BaseDiscordClient client, IApplicationCommand command, RequestOptions options = null)
+        {
+            return InteractionHelper.DeleteGlobalCommandAsync(client, command, options);
+        }
+        public static async Task<RestGuildCommand> ModifyGuildApplicationCommandAsync(BaseDiscordClient client, IApplicationCommand command, ulong guildId, ApplicationCommandProperties args, RequestOptions options = null)
+        {
+            var model = await InteractionHelper.ModifyGuildCommandAsync(client, command, guildId, args, options);
+
+            return RestGuildCommand.Create(client, model, guildId);
+        }
+        public static Task DeleteGuildCommandAsync(BaseDiscordClient client, ulong guildId, IApplicationCommand command, RequestOptions options = null)
+        {
+            return InteractionHelper.DeleteGuildCommandAsync(client, guildId, command, options);
+        }
         public static async Task<IReadOnlyCollection<RestGlobalCommand>> BulkOverwriteGlobalApplicationCommandAsync(BaseDiscordClient client, ApplicationCommandProperties[] properties,
             RequestOptions options = null)
         {

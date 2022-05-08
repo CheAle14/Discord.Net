@@ -195,8 +195,17 @@ namespace Discord.Rest
 
         public Task<RestGlobalCommand> CreateGlobalCommand(ApplicationCommandProperties properties, RequestOptions options = null)
             => ClientHelper.CreateGlobalApplicationCommandAsync(this, properties, options);
+        public Task<RestGlobalCommand> ModifyGlobalCommandAsync(IApplicationCommand command, ApplicationCommandProperties properties, RequestOptions options = null)
+            => ClientHelper.ModifyGlobalApplicationCommandAsync(this, command, properties, options);
+        public Task DeleteGlobalCommandAsync(IApplicationCommand command, RequestOptions options = null)
+            => ClientHelper.DeleteGlobalCommandAsync(this, command, options);
+
         public Task<RestGuildCommand> CreateGuildCommand(ApplicationCommandProperties properties, ulong guildId, RequestOptions options = null)
             => ClientHelper.CreateGuildApplicationCommandAsync(this, guildId, properties, options);
+        public Task<RestGuildCommand> ModifyGuildCommandAsync(IApplicationCommand command, ApplicationCommandProperties properties, ulong guildId, RequestOptions options = null)
+            => ClientHelper.ModifyGuildApplicationCommandAsync(this, command, guildId, properties, options);
+        public Task DeleteGuildCommandAsync(IApplicationCommand command, ulong guildId, RequestOptions options = null)
+            => ClientHelper.DeleteGuildCommandAsync(this, guildId, command, options);
         public Task<IReadOnlyCollection<RestGlobalCommand>> GetGlobalApplicationCommands(RequestOptions options = null)
             => ClientHelper.GetGlobalApplicationCommandsAsync(this, options);
         public Task<IReadOnlyCollection<RestGuildCommand>> GetGuildApplicationCommands(ulong guildId, RequestOptions options = null)
