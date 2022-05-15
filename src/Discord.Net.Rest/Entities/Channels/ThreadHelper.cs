@@ -12,11 +12,11 @@ namespace Discord.Rest
             ThreadArchiveDuration autoArchiveDuration = ThreadArchiveDuration.OneDay, IMessage message = null, bool? invitable = null, int? slowmode = null, RequestOptions options = null)
         {
             var features = channel.Guild.Features;
-            if (autoArchiveDuration == ThreadArchiveDuration.OneWeek && !features.HasFeature(GuildFeature.SevenDayThreadArchive))
+            /*if (autoArchiveDuration == ThreadArchiveDuration.OneWeek && !features.HasFeature(GuildFeature.SevenDayThreadArchive))
                 throw new ArgumentException($"The guild {channel.Guild.Name} does not have the SEVEN_DAY_THREAD_ARCHIVE feature!", nameof(autoArchiveDuration));
 
             if (autoArchiveDuration == ThreadArchiveDuration.ThreeDays && !features.HasFeature(GuildFeature.ThreeDayThreadArchive))
-                throw new ArgumentException($"The guild {channel.Guild.Name} does not have the THREE_DAY_THREAD_ARCHIVE feature!", nameof(autoArchiveDuration));
+                throw new ArgumentException($"The guild {channel.Guild.Name} does not have the THREE_DAY_THREAD_ARCHIVE feature!", nameof(autoArchiveDuration));*/
 
             if (type == ThreadType.PrivateThread && !features.HasFeature(GuildFeature.PrivateThreads))
                 throw new ArgumentException($"The guild {channel.Guild.Name} does not have the PRIVATE_THREADS feature!", nameof(type));
@@ -72,6 +72,14 @@ namespace Discord.Rest
             var model = await client.ApiClient.GetThreadMemberAsync(channel.Id, userId, options).ConfigureAwait(false);
 
             return RestThreadUser.Create(client, channel.Guild, model, channel);
+        }
+
+        public static async Task<Model[]> GetPublicArchivedThreadsAsync(ITextChannel channel, BaseDiscordClient client, DateTimeOffset? before = null, int? limit = null, RequestOptions options = null)
+        {
+            var response = await client.ApiClient.GetPublicArchivedThreadsAsync(channel.Id, before, limit, options);
+
+
+            return response.Threads.ToArray();
         }
     }
 }

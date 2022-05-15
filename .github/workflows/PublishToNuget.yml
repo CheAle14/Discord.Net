@@ -1,0 +1,32 @@
+name: PublishToNuget
+
+on: 
+  push:
+    branches:
+    - dev
+
+jobs:
+  Build-And-Publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Pull Repository
+      uses: actions/checkout@v1
+    - name: Setup .Net Core
+      uses: actions/setup-dotnet@v1.8.0
+      with:
+        dotnet-version: '6.0.x'
+    - name: Restore packages
+      run: dotnet restore "Discord.Net.sln" -v minimal
+    - name: Build with dotnet
+      run: dotnet build "Discord.Net.sln" --no-restore -v minimal -c Release /p:BuildNumber=696969 /p:IsTagBuild=True
+    - name: Pack everything
+      run: |
+        dotnet pack "src\Discord.Net.Core\Discord.Net.Core.csproj" --no-restore --no-build -v minimal -c Release -o "Packages" /p:BuildNumber=696969 /p:IsTagBuild=True
+        dotnet pack "src\Discord.Net.Rest\Discord.Net.Rest.csproj" --no-restore --no-build -v minimal -c Release -o "Packages" /p:BuildNumber=696969 /p:IsTagBuild=True
+        dotnet pack "src\Discord.Net.WebSocket\Discord.Net.WebSocket.csproj" --no-restore --no-build -v minimal -c Release -o "Packages" /p:BuildNumber=696969 /p:IsTagBuild=True
+        dotnet pack "src\Discord.Net.Commands\Discord.Net.Commands.csproj" --no-restore --no-build -v minimal -c Release -o "Packages" /p:BuildNumber=696969 /p:IsTagBuild=True
+        dotnet pack "src\Discord.Net.Webhook\Discord.Net.Webhook.csproj" --no-restore --no-build -v minimal -c Release -o "Packages" /p:BuildNumber=696969 /p:IsTagBuild=True
+        dotnet pack "src\Discord.Net.Interactions\Discord.Net.Interactions.csproj" --no-restore --no-build -v minimal -c Release -o "Packages" /p:BuildNumber=696969 /p:IsTagBuild=True
+    - name: Push to Nuget
+      run: dotnet nuget push Packages/ -s https://www.myget.org/F/cheale14/api/v2/package -k ${{ secrets.NUGET_API_KEY }} --skip-duplicate

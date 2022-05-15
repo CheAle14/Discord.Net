@@ -554,6 +554,296 @@ namespace Discord.Interactions
             return await RestClient.BulkOverwriteGlobalCommands(props.ToArray()).ConfigureAwait(false);
         }
 
+
+        bool IsEqual(ApplicationCommandProperties props, RestApplicationCommand cmd)
+        {
+            if (props.Type != cmd.Type)
+                return false;
+            if (props.Name.GetValueOrDefault() != cmd.Name)
+                return false;
+            if (props.IsDMEnabled.GetValueOrDefault() != cmd.IsEnabledInDm)
+                return false;
+            if (props.IsDefaultPermission.GetValueOrDefault() != cmd.IsDefaultPermission)
+                return false;
+            if ((ulong)props.DefaultMemberPermissions.GetValueOrDefault() != cmd.DefaultMemberPermissions.RawValue)
+                return false;
+
+            if (props is SlashCommandProperties sProps)
+                return isEqual(sProps, cmd);
+
+            return true;
+
+        }
+
+        bool isEqual(SlashCommandProperties props, RestApplicationCommand slash)
+        {
+            if (props.Description.GetValueOrDefault() != slash.Description)
+                return false;
+            var options = props.Options.GetValueOrDefault(new List<ApplicationCommandOptionProperties>());
+            if (options.Count != slash.Options.Count)
+                return false;
+            foreach(var option in options)
+            {
+                var slashOpt = slash.Options.FirstOrDefault(x => x.Name == option.Name);
+                if (slashOpt == null)
+                    return false;
+                if (!isEqual(option, slashOpt))
+                    return false;
+            }
+
+            return true;
+        }
+
+        bool isEqual(ApplicationCommandOptionProperties props, RestApplicationCommandOption option)
+        {
+            if (props.Type != option.Type)
+                return false;
+            if (props.Description != option.Description)
+                return false;
+            if (props.IsRequired.GetValueOrDefault() != option.IsRequired.GetValueOrDefault())
+                return false;
+
+            if ((props.Choices?.Count ?? 0) != (option.Choices?.Count ?? 0))
+                return false;
+            foreach(var propChoice in (props.Choices ?? new List<ApplicationCommandOptionChoiceProperties>()))
+            {
+                var optChoice = option.Choices.FirstOrDefault(x => x.Name == propChoice.Name);
+                if (optChoice == null)
+                    return false;
+                if (props.Type == ApplicationCommandOptionType.Integer)
+                    if ((long)(int)propChoice.Value != (long)optChoice.Value)
+                        return false;
+                else if (props.Type == ApplicationCommandOptionType.String)
+                    if ((string)propChoice.Value != (string)optChoice.Value)
+                        return false;
+                else if (props.Type == ApplicationCommandOptionType.Number)
+                    if ((double)propChoice.Value != (double)optChoice.Value)
+                        return false;
+            }
+
+            if ((props.Options?.Count ?? 0) != (option.Options?.Count ?? 0))
+                return false;
+            foreach(var propOpt in (props.Options ?? new List<ApplicationCommandOptionProperties>()))
+            {
+                var optOpt = option.Options.FirstOrDefault(x => x.Name == propOpt.Name);
+                if (optOpt == null)
+                    return false;
+                if (!isEqual(propOpt, optOpt))
+                    return false;
+            }
+
+            return true;
+        }
+
+        void fixPerms(List<ApplicationCommandProperties> commands)
+        {
+            foreach(var command in commands)
+            {
+                if(command.IsDefaultPermission.GetValueOrDefault())
+                {
+                    if (command.DefaultMemberPermissions.IsSpecified)
+                        command.IsDefaultPermission = false;
+                }
+            } 
+        }
+
+        public async Task SyncGlobalCommandsAsync(List<ApplicationCommandProperties> updated, bool simulate = true)
+        {
+            fixPerms(updated);
+            var existing = (await RestClient.GetGlobalApplicationCommands()).ToList();
+            if(existing.Count == 0)
+            {
+                await _cmdLogger.InfoAsync("No existing commands, bulk setting all");
+                if(!simulate)
+                    await RestClient.BulkOverwriteGlobalCommands(updated.ToArray());
+                return;
+            }
+
+
+            var toAdd = new List<ApplicationCommandProperties>();
+            var toModify = new Dictionary<IApplicationCommand, ApplicationCommandProperties>();
+            var toKeep = new List<ApplicationCommandProperties>();
+
+            foreach (var command in updated)
+            {
+                var old = existing.FirstOrDefault(x => x.Type == command.Type && x.Name == command.Name.Value);
+                if(old == null)
+                {
+                    await _cmdLogger.InfoAsync($"To add: {command.Name}");
+                    toAdd.Add(command);
+                } else
+                {
+                    existing.Remove(old);
+                    if(command.IsDefaultPermission.IsSpecified && command.IsDefaultPermission.Value == false)
+                    {
+                        if (command.DefaultMemberPermissions.IsSpecified == false)
+                            command.DefaultMemberPermissions = (GuildPermission)0;
+                    }
+
+                    if(IsEqual(command, old))
+                    {
+                        await _cmdLogger.InfoAsync($"Equal: {command.Name} {old.Id}");
+                        toKeep.Add(old.ToApplicationCommandProps());
+                    } else
+                    {
+                        await _cmdLogger.InfoAsync($"Different: {command.Name} {old.Id}");
+                        toModify.Add(old, command);
+                    }
+                }
+            }
+            var changing = toAdd.Count + toModify.Count + existing.Count;
+            await _cmdLogger.InfoAsync($"{toKeep.Count} same; {toAdd.Count} to add; {toModify.Count} to update; {existing.Count} to remove");
+            if (changing > toKeep.Count || changing > 4)
+            {
+                // more changing than staying the same, so we'll overwrite
+                toAdd.AddRange(toKeep);
+                toAdd.AddRange(toModify.Values);
+                if(!simulate)
+                    await RestClient.BulkOverwriteGlobalCommands(toAdd.ToArray());
+            } else
+            {
+                // we're keeping some, so we'll do it one-by-one.
+                foreach (var x in toAdd)
+                {
+                    await _cmdLogger.InfoAsync($"Adding {x.Name}");
+                    if(!simulate)
+                        await RestClient.CreateGlobalCommand(x);
+                }
+                foreach (var keypair in toModify)
+                {
+                    await _cmdLogger.InfoAsync($"Updating {keypair.Key.Id} {keypair.Value.Name}");
+                    if(!simulate)
+                        await RestClient.ModifyGlobalCommandAsync(keypair.Key, keypair.Value);
+                }
+                foreach (var x in existing)
+                {
+                    await _cmdLogger.InfoAsync($"Removing {x.Id} {x.Name}");
+                    if(!simulate)
+                        await RestClient.DeleteGlobalCommandAsync(x);
+                }
+            }
+        }
+
+        public async Task SyncGuildCommandsAsync(ulong guildId, List<ApplicationCommandProperties> updated, bool simulate = true)
+        {
+            fixPerms(updated);
+            var existing = (await RestClient.GetGuildApplicationCommands(guildId)).ToList();
+            if (existing.Count == 0)
+            {
+                await _cmdLogger.InfoAsync($"{guildId}: No existing commands, bulk setting all");
+                if (!simulate)
+                    await RestClient.BulkOverwriteGuildCommands(updated.ToArray(), guildId);
+                return;
+            }
+
+
+            var toAdd = new List<ApplicationCommandProperties>();
+            var toModify = new Dictionary<IApplicationCommand, ApplicationCommandProperties>();
+            var equal = new List<ApplicationCommandProperties>();
+
+            foreach (var command in updated)
+            {
+                var old = existing.FirstOrDefault(x => x.Type == command.Type && x.Name == command.Name.Value);
+                if (old == null)
+                {
+                    await _cmdLogger.InfoAsync($"{guildId}: To add: {command.Name}");
+                    toAdd.Add(command);
+                }
+                else
+                {
+                    existing.Remove(old);
+                    if (command.IsDefaultPermission.IsSpecified && command.IsDefaultPermission.Value == false)
+                    {
+                        if (command.DefaultMemberPermissions.IsSpecified == false)
+                            command.DefaultMemberPermissions = (GuildPermission)0;
+                    }
+
+                    if (IsEqual(command, old))
+                    {
+                        await _cmdLogger.InfoAsync($"{guildId}: Equal: {command.Name} {old.Id}");
+                        equal.Add(old.ToApplicationCommandProps());
+                    }
+                    else
+                    {
+                        await _cmdLogger.InfoAsync($"{guildId}: Different: {command.Name} {old.Id}");
+                        toModify.Add(old, command);
+                    }
+                }
+            }
+            var changing = toAdd.Count + toModify.Count + existing.Count;
+            await _cmdLogger.InfoAsync($"{guildId}: {equal.Count} same; {toAdd.Count} to add; {toModify.Count} to update; {existing.Count} to remove");
+            if (changing > equal.Count || changing > 4)
+            {
+                // a bunch changing
+                equal.AddRange(toAdd);
+                equal.AddRange(toModify.Values);
+                if (!simulate)
+                    await RestClient.BulkOverwriteGuildCommands(equal.ToArray(), guildId);
+            }
+            else
+            {
+                // we're keeping some, so we'll do it one-by-one.
+                foreach (var x in toAdd)
+                {
+                    await _cmdLogger.InfoAsync($"{guildId}: Adding {x.Name}");
+                    if (!simulate)
+                        await RestClient.CreateGuildCommand(x, guildId);
+                }
+                foreach (var keypair in toModify)
+                {
+                    await _cmdLogger.InfoAsync($"{guildId}: Updating {keypair.Key.Id} {keypair.Value.Name}");
+                    if (!simulate)
+                        await RestClient.ModifyGuildCommandAsync(keypair.Key, keypair.Value, guildId);
+                }
+                foreach (var x in existing)
+                {
+                    await _cmdLogger.InfoAsync($"{guildId}: Removing {x.Id} {x.Name}");
+                    if (!simulate)
+                        await RestClient.DeleteGuildCommandAsync(x, guildId);
+                }
+            }
+        }
+
+        public async Task SyncCommandsAsync(Func<ApplicationCommandProperties, ulong[]> guildSelector, bool simulate = true)
+        {
+            var topModules = _moduleDefs.Where(x => !x.IsSubModule);
+
+            var globalProps = new List<ApplicationCommandProperties>();
+            var guildProps = new Dictionary<ulong, List<ApplicationCommandProperties>>();
+            foreach(var module in topModules)
+            {
+                if (module.SlashCommands.Count == 0 && module.ContextCommands.Count == 0)
+                    continue;
+                if (module.DontAutoRegister)
+                {
+                    var commands = module.ToApplicationCommandProps(true);
+                    foreach(var x in commands)
+                    {
+                        var ids = guildSelector(x);
+                        foreach(var id in ids)
+                        {
+                            if (guildProps.TryGetValue(id, out var ls))
+                                ls.Add(x);
+                            else
+                                guildProps[id] = new List<ApplicationCommandProperties>() { x };
+                        }
+                    }
+                }
+                else
+                {
+                    globalProps.AddRange(module.ToApplicationCommandProps());
+                }
+            }
+
+            await SyncGlobalCommandsAsync(globalProps, simulate);
+            foreach(var keypair in guildProps)
+            {
+                await _cmdLogger.InfoAsync($"Syncing for {keypair.Key}");
+                await SyncGuildCommandsAsync(keypair.Key, keypair.Value, simulate);
+            }
+        }
+
+
         private void LoadModuleInternal (ModuleInfo module)
         {
             _moduleDefs.Add(module);
