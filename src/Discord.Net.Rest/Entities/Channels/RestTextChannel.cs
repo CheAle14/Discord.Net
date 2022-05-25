@@ -308,13 +308,8 @@ namespace Discord.Rest
 
         private string DebuggerDisplay => $"{Name} ({Id}, Text)";
 
-        public async Task<IReadOnlyCollection<RestThreadChannel>> GetPublicArchivedThreadsAsync(DateTimeOffset? before = null, int? limit = null, RequestOptions options = null)
-        {
-            var threads = await ThreadHelper.GetPublicArchivedThreadsAsync(this, Discord, before, limit, options);
-            return threads.Select(x => RestGuildChannel.Create(Discord, Guild, x))
-                .Cast<RestThreadChannel>()
-                .ToImmutableArray();
-        }
+        public Task<IReadOnlyCollection<RestThreadChannel>> GetPublicArchivedThreadsAsync(DateTimeOffset? before = null, int? limit = null, RequestOptions options = null)
+            => ThreadHelper.GetPublicArchivedThreadsAsync(this, Discord, limit, before, options);
         #endregion
 
         #region ITextChannel

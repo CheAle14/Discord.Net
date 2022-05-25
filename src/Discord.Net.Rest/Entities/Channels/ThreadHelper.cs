@@ -102,14 +102,6 @@ namespace Discord.Rest
 
             return RestThreadUser.Create(client, channel.Guild, model, channel);
         }
-
-        public static async Task<Model[]> GetPublicArchivedThreadsAsync(ITextChannel channel, BaseDiscordClient client, DateTimeOffset? before = null, int? limit = null, RequestOptions options = null)
-        {
-            var response = await client.ApiClient.GetPublicArchivedThreadsAsync(channel.Id, before, limit, options);
-
-
-            return response.Threads.ToArray();
-        }
         
         public static async Task<RestThreadChannel> CreatePostAsync(IForumChannel channel, BaseDiscordClient client, string title, ThreadArchiveDuration archiveDuration = ThreadArchiveDuration.OneDay, int? slowmode = null, string text = null, Embed embed = null, RequestOptions options = null, AllowedMentions allowedMentions = null, MessageComponent components = null, ISticker[] stickers = null, Embed[] embeds = null, MessageFlags flags = MessageFlags.None)
         {
