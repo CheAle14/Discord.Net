@@ -607,11 +607,11 @@ namespace Discord.API
 
             if (limit.HasValue)
             {
-                query = $"?before={before.GetValueOrDefault(DateTimeOffset.UtcNow).ToString("O")}&limit={limit.Value}";
+                query = $"?before={before.GetValueOrDefault(DateTimeOffset.UtcNow).UtcDateTime.ToString("O")}&limit={limit.Value}";
             }
             else if (before.HasValue)
             {
-                query = $"?before={before.Value.ToString("O")}";
+                query = $"?before={before.Value.UtcDateTime:O}";
             }
 
             return await SendAsync<ChannelThreads>("GET", () => $"channels/{channelId}/threads/archived/public{query}", bucket, options: options);
